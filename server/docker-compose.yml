@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16.2-alpine3.19
+    volumes:
+      - ./data/postgres:/data
+    ports:
+      - 5432:5432
+    environment:
+      # TODO: add `sudo apt-get install language-pack-XX` to DB image
+      #LANG: ru_RU.utf8
+      LANG: en_US.utf8
+      PGDATA: /data
+      POSTGRES_DB: chat_server_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
