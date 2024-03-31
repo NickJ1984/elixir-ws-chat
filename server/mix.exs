@@ -43,10 +43,10 @@ defmodule Server.MixProject do
   end
 
   defp ecto_setup_test_env(_) do
-    System.cmd("mix", ["ecto.setup"], [env: [{"MIX_ENV", "test"}]])
+    System.cmd("mix", ["ecto.setup"], [env: [{"MIX_ENV", "test"}], into: IO.binstream(:stdio, :line)])
   end
 
   defp ecto_reset_test_env(_) do
-    System.cmd("mix", ["ecto.reset"], [env: [{"MIX_ENV", "test"}]])
+    System.cmd("mix", ["ecto.reset"], [env: [{"MIX_ENV", "test"}], into: IO.binstream(:stdio, :line)])
   end
 end
