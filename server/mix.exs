@@ -6,6 +6,7 @@ defmodule Server.MixProject do
       app: :server,
       version: "0.1.0",
       elixir: "~> 1.14",
+      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
@@ -19,6 +20,9 @@ defmodule Server.MixProject do
     ]
   end
 
+  defp elixirc_paths(:test), do: ~w[lib test/support]
+  defp elixirc_paths(_), do: ~w[lib]
+
   defp deps do
     [
       {:plug, "~> 1.15"},
@@ -30,9 +34,19 @@ defmodule Server.MixProject do
 
   defp aliases do
     [
-      setup: ["deps.get", "ecto.setup"],
+      setup: ["deps.get", "ecto.setup", "ecto.setup_test_env"],
+      "ecto.setup_test_env": &ecto_setup_test_env/1,
       "ecto.setup": ["ecto.create", "ecto.migrate"],
+      "ecto.reset_test_env": &ecto_reset_test_env/1,
       "ecto.reset": ["ecto.drop", "ecto.setup"],
     ]
+  end
+
+  defp ecto_setup_test_env(_) do
+    System.cmd("mix", ["ecto.setup"], [env: [{"MIX_ENV", "test"}]])
+  end
+
+  defp ecto_reset_test_env(_) do
+    System.cmd("mix", ["ecto.reset"], [env: [{"MIX_ENV", "test"}]])
   end
 end

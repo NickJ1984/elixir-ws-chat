@@ -45,10 +45,10 @@ defmodule Server.Schema.User do
   end
 
   @spec validate_login(login) :: :ok | :error
-  def validate_login(login), do: validate_binary_length(login, @login_max_length)
+  def validate_login(login), do: validate_binary_field(login, @login_max_length)
 
   @spec validate_password(password) :: :ok | :error
-  def validate_password(password), do: validate_binary_length(password, @password_max_length)
+  def validate_password(password), do: validate_binary_field(password, @password_max_length)
 
   @spec create(login, password) :: create_response
   def create(login, password) do
@@ -70,9 +70,11 @@ defmodule Server.Schema.User do
 
   @spec get(login) :: {:ok, t} | {:error, :not_found}
   def get(login) when is_binary(login) do
-    case Repo.get_by(__MODULE__, login: login) do
-      nil -> {:error, :not_found}
-      user -> {:ok, user}
+    with :ok <- validate_login(login),
+         %__MODULE__{} = user <- Repo.get_by(__MODULE__, login: login) do
+      {:ok, user}
+    else
+      _ -> {:error, :not_found}
     end
   end
   def get(_login), do: {:error, :not_found}
@@ -92,13 +94,13 @@ defmodule Server.Schema.User do
     end
   end
 
-  defp validate_binary_length("", _max), do: :error
-  defp validate_binary_length(bin, max) when is_binary(bin) do
-    if String.length(bin) > max do
-      :error
-    else
+  defp validate_binary_field("", _max), do: :error
+  defp validate_binary_field(bin, max) when is_binary(bin) do
+    if String.valid?(bin) and String.length(bin) <= max do
       :ok
+    else
+      :error
     end
   end
-  defp validate_binary_length(_bin, _max), do: :error
+  defp validate_binary_field(_bin, _max), do: :error
 end

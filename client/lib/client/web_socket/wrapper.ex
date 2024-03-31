@@ -198,13 +198,13 @@ defmodule Client.WebSocket.Wrapper do
     {:noreply, set_heartbeat_timer(st)}
   end
   def handle_info(:send_heartbeat, st) do
-    {:noreply, clear_heartbeat(st)}
+    {:noreply, clear_heartbeat(st, true)}
   end
   def handle_info({:idle_timeout, idle_timeout, client}, %{client: client, status: :ok} = st) do
     %{heartbeat: heartbeat} = st
     st =
       with true <- heartbeat.status == :pending,
-          {:ok, repeat_time} <- process_heartbeat_repeat_time(idle_timeout) do
+          {:ok, repeat_time} <- idle_timeout_to_repeat_time(idle_timeout) do
         heartbeat = %{heartbeat | repeat_time: repeat_time, status: :set}
         Logger.info("client: heartbeat is set (#{repeat_time}ms)")
         st
@@ -234,7 +234,7 @@ defmodule Client.WebSocket.Wrapper do
     {:noreply, clear_state(st)}
   end
   def handle_info({:EXIT, _client, :normal}, st) do
-    {:noreply, st}
+    {:noreply, clear_state(st)}
   end
 
   defp heartbeat(:set, st) do
@@ -264,14 +264,21 @@ defmodule Client.WebSocket.Wrapper do
     end
   end
 
-  defp clear_heartbeat(%{heartbeat: heartbeat} = st) do
+  defp clear_heartbeat(%{heartbeat: heartbeat} = st, clear_repeat_time? \\ false) do
     if is_reference(heartbeat.ref), do: Process.cancel_timer(heartbeat.ref)
-    %{st | heartbeat: %{heartbeat | ref: nil, status: nil}}
+    to_merge =
+      if clear_repeat_time? do
+        %{ref: nil, repeat_time: nil, status: nil}
+      else
+        %{ref: nil, status: nil}
+      end
+    heartbeat = Map.merge(heartbeat, to_merge)
+    %{st | heartbeat: heartbeat}
   end
 
   defp clear_state(st) do
     st
-    |> clear_heartbeat()
+    |> clear_heartbeat(true)
     |> Map.merge(%{client: nil, status: nil})
   end
 
@@ -282,7 +289,7 @@ defmodule Client.WebSocket.Wrapper do
     put_in(st, ~w[heartbeat ref]a, ref)
   end
 
-  defp process_heartbeat_repeat_time(idle_timeout) do
+  defp idle_timeout_to_repeat_time(idle_timeout) do
     with {timeout, _} when timeout > 0 <- Integer.parse(idle_timeout),
          timeout when timeout > 0 <- trunc(timeout * 0.9) do
       {:ok, timeout}
@@ -291,8 +298,11 @@ defmodule Client.WebSocket.Wrapper do
     end
   end
 
-  defp process_client_exit_messages({:remote, 1008, error}), do: Logger.error("connection: #{error}")
-  defp process_client_exit_messages({:remote, :closed}), do: Logger.error("connection: server interrupted connection")
+  defp process_client_exit_messages({:remote, 1008, reason}), do: Logger.error("connection: #{reason}")
+  defp process_client_exit_messages({:remote, code, reason}) do
+    Logger.error("connection: interrupted by server with code #{code} and reason: \"#{reason}\"")
+  end
+  defp process_client_exit_messages({:remote, :closed}), do: Logger.error("connection: interrupted by server")
   defp process_client_exit_messages(:normal), do: Logger.error("connection: timed out")
   defp process_client_exit_messages(message) do
     Logger.error("connection: interrupted for an unknown reason: #{inspect(message)}")
